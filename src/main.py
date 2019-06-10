@@ -92,10 +92,39 @@ def serial_to_id(json_obj: json, id_serial: Dict[str, int]) -> List[int]:
     items = json_obj['items']
     for i in range(length):
         item = items[i]
-        idx: int = int(item['statistics']['subscriberCount'])
+        idx: int = id_serial[item['id']]
         idxs.append(idx)
 
     return idxs
+
+
+def payload_process(chunk: List[Tuple[int, str]]) -> None:
+    ids: List[str] = [s for (idx, s) in chunk]
+
+    print('Gathering metrics for', chunk)
+
+    id_serial: Dict[str, int] = {}
+    for (i, s) in chunk:
+        id_serial[s] = i
+
+    metrics: str = get_metrics(ids)
+    json_obj: json = json.loads(metrics)
+    idxs: List[int] = serial_to_id(json_obj, id_serial)
+    print('Got', len(idxs), 'results from google api')
+
+    proto: message_pb2.SubMessage = metrics_to_protobuf(json_obj, idxs)
+    print(str(proto).replace('\n', ', '))
+
+    proto_msg: str = proto.SerializeToString()
+
+    ack: str = requests.post(write_server, data=proto_msg).text
+    ack_msg: message_pb2.Ack = message_pb2.Ack()
+    ack_msg.ParseFromString(ack.encode())
+
+    if ack_msg.ok:
+        print('Message sent succesfully')
+    else:
+        print('Message failed to be sent')
 
 
 def main() -> None:
@@ -103,23 +132,7 @@ def main() -> None:
     chans: List[Tuple[int, str]] = get_channels()
 
     for chunk in divide_chunks(chans):
-        ids: List[str] = [s for (idx, s) in chunk]
-
-        print('Gathering metrics for', chunk)
-
-        id_serial: Dict[str, int] = {}
-        for (i, s) in chunk:
-            id_serial[s] = i
-
-        metrics: str = get_metrics(ids)
-        json_obj: json = json.loads(metrics)
-        idxs: List[int] = serial_to_id(json_obj, id_serial)
-        print('Got', len(idxs), 'results from google api')
-
-        proto: message_pb2.SubMessage = metrics_to_protobuf(json_obj, idxs)
-        print(str(proto).replace('\n', ', '))
-
-
+        payload_process(chunk)
 
 
 if __name__ == '__main__':
