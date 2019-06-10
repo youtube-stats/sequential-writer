@@ -71,16 +71,31 @@ def get_metrics(channels: List[str]) -> str:
     return requests.get(url).text
 
 
-def metrics_to_protobuf(json_str: str) -> message_pb2.SubMessage:
-    json_obj: json = json.loads(json_str)
-
+def metrics_to_protobuf(json_obj: json, idxs: List[int]) -> message_pb2.SubMessage:
     msg: message_pb2.SubMessage = message_pb2.SubMessage()
     msg.timestamp = int(time.time())
 
     items = json_obj['items']
     for i in range(len(items)):
         item = items[i]
-        msg
+        msg.ids.append(idxs[i])
+        sub: int = int(item['statistics']['subscriberCount'])
+        msg.subs.append(sub)
+
+    return msg
+
+
+def serial_to_id(json_obj: json, id_serial: Dict[str, int]) -> List[int]:
+    idxs: List[int] = []
+    length: int = len(json_obj['items'])
+
+    items = json_obj['items']
+    for i in range(length):
+        item = items[i]
+        idx: int = int(item['statistics']['subscriberCount'])
+        idxs.append(idx)
+
+    return idxs
 
 
 def main() -> None:
@@ -97,7 +112,12 @@ def main() -> None:
             id_serial[s] = i
 
         metrics: str = get_metrics(ids)
-        proto: message_pb2.SubMessage = metrics_to_protobuf(metrics)
+        json_obj: json = json.loads(metrics)
+        idxs: List[int] = serial_to_id(json_obj, id_serial)
+        print('Got', len(idxs), 'results from google api')
+
+        proto: message_pb2.SubMessage = metrics_to_protobuf(json_obj, idxs)
+        print(str(proto).replace('\n', ', '))
 
 
 
