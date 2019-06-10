@@ -2,5 +2,4 @@ google
 protobuf
 psycopg2
 psycopg2-binary
-pytz
 requests

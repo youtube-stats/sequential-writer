@@ -1,8 +1,12 @@
 import atexit
+import time
+import json
+from message import message_pb2
 import psycopg2
 import requests
 from typing import List
 from typing import Tuple
+from typing import Dict
 
 
 api_key_server: str = 'http://localhost:8080/get'
@@ -13,6 +17,14 @@ password: str = ''
 pg_host: str = 'localhost'
 pg_port: str = '5432'
 database: str = 'youtube'
+chunk_size: int = 50
+google_api: str = 'https://www.googleapis.com/youtube/v3/channels?part=statistics&key=%s&id=%s'
+
+
+def divide_chunks(l: List[Tuple[int, str]], n=chunk_size):
+    while True:
+        for i in range(0, len(l), n):
+            yield l[i:i + n]
 
 
 def connect() -> psycopg2:
@@ -51,11 +63,43 @@ def get_api_key() -> str:
     return requests.get(api_key_server).text
 
 
+def get_metrics(channels: List[str]) -> str:
+    key: str = get_api_key()
+    ids: str = ','.join(channels)
+    url: str = google_api % (key, ids)
+
+    return requests.get(url).text
+
+
+def metrics_to_protobuf(json_str: str) -> message_pb2.SubMessage:
+    json_obj: json = json.loads(json_str)
+
+    msg: message_pb2.SubMessage = message_pb2.SubMessage()
+    msg.timestamp = int(time.time())
+
+    items = json_obj['items']
+    for i in range(len(items)):
+        item = items[i]
+        msg
+
+
 def main() -> None:
     print(get_api_key())
     chans: List[Tuple[int, str]] = get_channels()
 
-    
+    for chunk in divide_chunks(chans):
+        ids: List[str] = [s for (idx, s) in chunk]
+
+        print('Gathering metrics for', chunk)
+
+        id_serial: Dict[str, int] = {}
+        for (i, s) in chunk:
+            id_serial[s] = i
+
+        metrics: str = get_metrics(ids)
+        proto: message_pb2.SubMessage = metrics_to_protobuf(metrics)
+
+
 
 
 if __name__ == '__main__':
