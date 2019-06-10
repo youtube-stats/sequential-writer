@@ -128,7 +128,6 @@ def payload_process(chunk: List[Tuple[int, str]]) -> None:
 
 
 def main() -> None:
-    print(get_api_key())
     chans: List[Tuple[int, str]] = get_channels()
 
     for chunk in divide_chunks(chans):
